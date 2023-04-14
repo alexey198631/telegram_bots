@@ -5,8 +5,11 @@ import config
 filename = config.SERVICE_ACCOUNT
 
 gc = gspread.service_account(filename)
+wks = gc.open("my37").sheet1
 
+print(wks)
 
+"""
 # Open a sheet from a spreadsheet in one go
 wks = gc.open("my37").worksheet('timing')
 
@@ -23,6 +26,12 @@ df.to_excel(writer, sheet_name='cs')
 writer.save()
 
 
+worksheet = wks.worksheet('Blad20')
+
+# delete the sheet
+wks.del_worksheet(worksheet)
+
+"""
 
 
 
