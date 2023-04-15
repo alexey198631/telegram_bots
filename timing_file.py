@@ -1,99 +1,85 @@
 import gspread
 import pandas as pd
 import openpyxl
+from openpyxl.utils.dataframe import dataframe_to_rows
 import config
 
 filename = config.SERVICE_ACCOUNT
 dairy_file = config.DAYS
+gbook = config.GBOOK
+glist = config.GSHEET
+elist = config.ELIST
 
 gc = gspread.service_account(filename)
-#wks = gc.open("my37").sheet1
 
 # Open a sheet from a spreadsheet in one go
-wks = gc.open("my37").worksheet('days')
+spr = gc.open(gbook).worksheet(glist)
 
 # Get all the data from the sheet as a list of lists
-data = wks.get_all_values()
+data = spr.get_all_values()
 
 # Convert the data to a pandas dataframe
-df_new = pd.DataFrame(data[1:], columns=data[0])
+df_google = pd.DataFrame(data[1:], columns=data[0])
 
-# поиск индекса последнего элемента в колонке "column_name"
-last_index = df_new.index[df_new['DEND'] == df_new['DEND'].max()].tolist()[-1]
+# Search for the last not empty element in DAY column
+last_index = df_google['DAY'].tolist().index('') - 1
+df_google = df_google.loc[:last_index, :]
 
-df_new = df_new.loc[:last_index, :]
-
-
-
-print(df_new.columns)
-
-
-# Преобразование колонки в тип float
-#df['float_col'] = df['float_col'].astype(float)
-
-# Преобразование колонки в тип int
-#df['int_col'] = df['int_col'].astype(int)
-
-# Преобразование колонки в тип datetime
-df_new['105'] = pd.to_datetime(df_new['105'], format='%d/%m/%Y')
-df_new['DEND'] = pd.to_datetime(df_new['DEND'], format='%H:%M')
-df_new['DEND'] = df_new['DEND'].dt.strftime('%H:%M')
-df_new['DSTART'] = pd.to_datetime(df_new['DSTART'], format='%H:%M')
-print(df_new.tail(5))
-df_new.info()
-
-# Load the workbook
+# Load the Days Diary xlsx workbook
 workbook = openpyxl.load_workbook(dairy_file)
 
 # Select the sheet you want to modify
-sheet = workbook['copy']
+sheet = workbook[elist]
 
-# Извлекаем данные из листа и создаем DataFrame
+# Save data frame from sheet data
 data_days = sheet.values
 cols = next(data_days)[0:]
-df = pd.DataFrame(data_days, columns=cols)
+df_days = pd.DataFrame(data_days, columns=cols)
 
-print(df.tail(5))
+# Rename all columns which have different name because in Google Sheet file modified names are being used
+col_names_correct = {}
+for i in range(len(cols)):
+    if cols[i] != data[0][i]:
+        col_names_correct[data[0][i]] = cols[i]
+        df_google = df_google.rename(columns=col_names_correct)
 
-df.info()
+# Loop over each column and convert it to the desired data type
+for col in df_google.columns:
+    # Check if the data type of the column is a string ('object')
+    col_dtype = df_days[col].dtype
+    # Convert the column to dtype of original dataframe
+    if col_dtype == 'datetime64[ns]':
+        df_google[col] = pd.to_datetime(df_google[col], format='%d/%m/%Y')
+    elif col_dtype == 'float':
+        # Apply the transformation to the entire column
+        df_google[col] = df_google[col].apply(lambda x: float(x.replace(',', '.')))
+        df_google[col] = df_google[col].astype(col_dtype)
+    else:
+        df_google[col] = df_google[col].astype(col_dtype)
 
 
+# Create a new worksheet with the same formatting as the existing worksheet
+new_worksheet = workbook.create_sheet('Temp')
+new_worksheet.sheet_format = sheet.sheet_format
+new_worksheet.sheet_properties = sheet.sheet_properties
+new_worksheet.page_setup = sheet.page_setup
 
+# Write the updated DataFrame to the worksheet
+for r in dataframe_to_rows(df_google, index=False, header=True):
+    new_worksheet.append(r)
 
+# Delete all existing rows in the worksheet
+sheet.delete_rows(1, sheet.max_row)
+for row in new_worksheet.iter_rows():
+    sheet.append([cell.value for cell in row])
 
+# Delete the temporary worksheet
+workbook.remove(new_worksheet)
+
+# Save the changes to the Excel file
+workbook.save(dairy_file)
 # Close the workbook
 workbook.close()
-
-diff_df = pd.merge(df, df_new, how='outer', indicator=True).query("_merge != 'both'").drop(columns='_merge')
-
-writer = pd.ExcelWriter('data_files/experiment.xlsx', engine='xlsxwriter')
-diff_df.to_excel(writer, sheet_name='cs')
-writer.save()
-
-"""
-
-# Save the modified workbook
-workbook.save()
-
-
-
-
-
-
-writer = pd.ExcelWriter('timing_t.xlsx', engine='xlsxwriter')
-df.to_excel(writer, sheet_name='cs')
-writer.save()
-
-
-worksheet = wks.worksheet('Blad20')
-
-# delete the sheet
-wks.del_worksheet(worksheet)
-
-"""
-
-
-
 
 
 
