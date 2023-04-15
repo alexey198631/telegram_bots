@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import datetime
 import telebot
 import gspread
 
@@ -11,31 +11,32 @@ bot = telebot.TeleBot(bot_token)
 gc = gspread.service_account(filename)
 
 
-# приветствуем пользователя и говорим что умеем..
+# bot greetings
 @bot.message_handler(commands=['start', 'help'])
 def send_welcome(message):
     bot.reply_to(message,
-                 "Привет, я буду записивать ваши расходы времени в таблицу. Введите активность через дефис в виде [АКТИВНОСТЬ-ЯЗЫК]:")
+                 "Hi, I will help you to keep your timing file. Please type in your activity in this form: [Language - Activity - Comments]:")
 
 
 @bot.message_handler(content_types=["text"])
 def repeat_all_messages(message):
     try:
-        today = date.today().strftime("%d.%m.%Y")
+        # keeping starting time
+        today = datetime.now().strftime("%Y-%m-%d %H:%M")
 
-        #  разделяем сообщение на 2 части, категория и цена
-        category, language = message.text.split("-", 1)
-        text_message = f'На {today} в таблицу добавлена запись: категория {category}, язык {language} '
+        #  split incoming message
+        language, activity, comment = message.text.split("-")
+        text_message = f'Now I have written this {activity} "{comment}" with this language {language} with starting time {today}. Keep going! '
         bot.send_message(message.chat.id, text_message)
 
-        # открываем Google таблицу и добавляем запись
+        # Open Google Sheet table
         sh = gc.open_by_key(googlesheet_id)
-        sh.sheet1.append_row([today, category, language])
+        sh.sheet1.append_row([today, activity, language, comment])
     except:
-        # если пользователь ввел неправильную информацию, оповещаем его и просим вводить повторно
-        bot.send_message(message.chat.id, 'ОШИБКА! Неправильный формат данных!')
+        # If something wrong it asks to type in data
+        bot.send_message(message.chat.id, 'ERROR! Please use right format!')
 
-    bot.send_message(message.chat.id, 'Введите расход через дефис в виде [КАТЕГОРИЯ-[ЯЗЫК]:')
+    bot.send_message(message.chat.id, 'Please type in your activity in this form: [Language - Activity - Comments]:')
 
 
 if __name__ == '__main__':
