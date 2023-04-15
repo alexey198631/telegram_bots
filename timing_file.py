@@ -4,6 +4,7 @@ import openpyxl
 import config
 
 filename = config.SERVICE_ACCOUNT
+dairy_file = config.DAYS
 
 gc = gspread.service_account(filename)
 #wks = gc.open("my37").sheet1
@@ -42,7 +43,7 @@ print(df_new.tail(5))
 df_new.info()
 
 # Load the workbook
-workbook = openpyxl.load_workbook('/Users/aleksejgukov/Desktop/Days.xlsx')
+workbook = openpyxl.load_workbook(dairy_file)
 
 # Select the sheet you want to modify
 sheet = workbook['copy']
@@ -65,14 +66,14 @@ workbook.close()
 
 diff_df = pd.merge(df, df_new, how='outer', indicator=True).query("_merge != 'both'").drop(columns='_merge')
 
-writer = pd.ExcelWriter('/Users/aleksejgukov/Desktop/experiment.xlsx', engine='xlsxwriter')
+writer = pd.ExcelWriter('data_files/experiment.xlsx', engine='xlsxwriter')
 diff_df.to_excel(writer, sheet_name='cs')
 writer.save()
 
 """
 
 # Save the modified workbook
-workbook.save('/Users/aleksejgukov/Desktop/timing.xlsx')
+workbook.save()
 
 
 
